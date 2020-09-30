@@ -76,6 +76,27 @@ namespace Isis {
       void TearDown() override;
   };
 
+  class Hayabusa2OncTSmallCube : public TempTestingFiles {
+    protected:
+      Cube *testCube;
+
+      Pvl label;
+
+      void SetUp() override;
+      void TearDown() override;
+      void resetCube();
+  };
+
+  class Hayabusa2OncTCube : public TempTestingFiles {
+    protected:
+      Cube *testCube;
+
+      Pvl label;
+
+      void SetUp() override;
+      void TearDown() override;
+  };
+
   class ThreeImageNetwork : public TempTestingFiles {
     protected:
 
