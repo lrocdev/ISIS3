@@ -19,7 +19,7 @@ namespace Isis {
 
  /**
   * Create an LROCEmpirical photometric object
-  * 
+  *
   * @author 2016-08-15 Victor Silva
   *
   * @internal
@@ -41,14 +41,14 @@ namespace Isis {
    * @brief Initialize class from input PVL and Cube files
    *
    * This method is typically called at the class instantiation
-   * time but is reentrant. It reads the parameter PVL file and 
+   * time but is reentrant. It reads the parameter PVL file and
    * extracts Photometric model and Normalization models from it.
    * The cube is needed to match all potential profiles for each
    * band.
    *
    * @param pvl Input PVL parameter files
    * @param cube Input cube file to correct
-   * 
+   *
    * @throws IException::User "Errors in the input PVL file."
    * @throws IException::User "Band with wavelength Center does not have
    *                           PhotometricModel Algorithm group/profile."
@@ -76,7 +76,6 @@ namespace Isis {
     PvlObject::PvlGroupIterator algo = phoObj.beginGroup();
 
     while (algo != phoObj.endGroup()) {
-
       if (algo->name().toLower() == "algorithm") {
         m_profiles.push_back(DbProfile(phoProf, DbProfile(*algo)));
       }
@@ -96,7 +95,7 @@ namespace Isis {
       }
       else { // Appropriate photometric parameters not found
         ostringstream mess;
-        mess << "Band [" << i + 1 << "] with wavelength Center = [" << center[i] << 
+        mess << "Band [" << i + 1 << "] with wavelength Center = [" << center[i] <<
         "] does not have PhotometricModel Algorithm group/profile";
         IException e(IException::User, mess.str(), _FILEINFO_);
         errs += e.toString() + "\n";
@@ -112,19 +111,18 @@ namespace Isis {
     return;
   }
 
-
   /**
    * @brief Method to get photometric property given angles
    *
-   * This method computes photometric property at the given cube location after 
+   * This method computes photometric property at the given cube location after
    * proper parameter container is found for the specific band.
-   * 
+   *
    * @param i    Incidence angle in degrees
    * @param e    Emission angle in degrees
    * @param g    Phase angle in degrees
    * @param band cube band to be tested
    *
-   * 
+   *
    * @throws IException::Programmer "Provided band out of range."
    *
    * @return @b double The photometric property
@@ -146,11 +144,10 @@ namespace Isis {
     return (m_bandpho[band - 1].phoStd / ph);
   }
 
-
   /**
    * @brief Performs actual photometric correction calculations
    *
-   * This routine computes photometric correction using parameters for the 
+   * This routine computes photometric correction using parameters for the
    * LROC Emperical equation.
    *
    * @param parms Container of band-specific exponential parameters
@@ -165,7 +162,8 @@ namespace Isis {
    * @internal
    *   @history 2016-08-15 Victor Silva - Adapted code from lrowacpho application
    *                         written by Kris Becker
-   *
+   *   @history 2021-03-12 Victor Silva - Added b parameters for 2019 version of
+   *            LROC Empirical algorithm
    */
   double LROCEmpirical::photometry( const Parameters &parms, double i, double e, double g ) const {
     //  Ensure problematic values are adjusted
@@ -185,25 +183,35 @@ namespace Isis {
     double mu = cos(e);
     double mu0 = cos(i);
     double alpha = g;
-    double rcal =  exp(parms.a0 + parms.a1 * alpha + parms.a2 * mu +  parms.a3 * mu0);
+    double rcal;
+
+    if (parms.algoVersion == 2014 || parms.algoVersion == 0)
+      rcal =  exp(parms.aTerms[0] + parms.aTerms[1] * alpha + parms.aTerms[2] * mu +  parms.aTerms[3] * mu0);
+    else if (parms.algoVersion == 2019)
+      rcal = mu0 / (mu + mu0) * exp(parms.bTerms[0] + parms.bTerms[1] * (alpha * alpha) + parms.bTerms[2] * alpha + parms.bTerms[3] * sqrt(alpha) + parms.bTerms[4] * mu + parms.bTerms[5] * mu0 + parms.bTerms[6] * (mu0 * mu0) );
+    else {
+      std::string mess = "Algorithm version in PVL file not recognized [" + IString(parms.algoVersion) + "]. ";
+      throw IException(IException::Programmer, mess, _FILEINFO_);
+    }
 
     return (rcal);
   }
 
-
   /**
    * @brief Return parameters used for all bands
-   * 
+   *
    * Method creates keyword vector of band-specific parameters
    * used in the photometric correction.
    *
    * @param pvl Output PVL container for keywords written
    *
-   * @author 2016-08-15 Victor Silva 
+   * @author 2016-08-15 Victor Silva
    *
    * @internal
    *   @history 2016-08-15 Victor Silva - Adapted code from lrowacpho application
    *                         written by Kris Becker
+   *   @history 2021-03-12 Victor Silva - Added b parameters for 2019 version of
+   *            LROC Empirical algorithm
    */
   void LROCEmpirical::report( PvlContainer &pvl ) {
 
@@ -211,16 +219,18 @@ namespace Isis {
     pvl.addComment(" where:");
     pvl.addComment("  mu0 = cos(incidence)");
     pvl.addComment("  mu = cos(emission)");
-    pvl.addComment("  F(mu, mu0, phase) = exp(A0 + A1 * phase + A2 * mu + A3 * mu0 ");
+
+    if (m_bandpho[0].algoVersion == 2019 )
+      pvl.addComment("  F(mu, mu0, phase) = mu0 / (mu + mu0) * exp(B0 + B1 * (alpha * alpha) + B2 * alpha + B3 * sqrt(alpha) + B4 * mu + B5 * mu0 + B6 * (mu0 * mu0) )");
+    else if (m_bandpho[0].algoVersion == 2014 || m_bandpho[0].algoVersion == 0)
+      pvl.addComment("  F(mu, mu0, phase) = exp (A0 + A1 * phase + A2 * mu + A3 * mu0 ");
+    else {
+      std::string mess = "Could not file the correction algorithm name.";
+      throw IException(IException::Programmer, mess, _FILEINFO_);
+    }
 
     pvl += PvlKeyword("Algorithm", "LROC_Empirical");
-    pvl += PvlKeyword("IncRef", toString(m_iRef), "degrees");
-    pvl += PvlKeyword("EmaRef", toString(m_eRef), "degrees");
-    pvl += PvlKeyword("Algorithm", "LROC_Empirical");
-    pvl += PvlKeyword("IncRef", toString(m_iRef), "degrees");
-    pvl += PvlKeyword("EmaRef", toString(m_eRef), "degrees");
-    pvl += PvlKeyword("EmaRef", toString(m_eRef), "degrees");
-    pvl += PvlKeyword("Algorithm", "LROC_Empirical");
+    pvl += PvlKeyword("AlgorithmVersion", toString(m_bandpho[0].algoVersion), "" );
     pvl += PvlKeyword("IncRef", toString(m_iRef), "degrees");
     pvl += PvlKeyword("EmaRef", toString(m_eRef), "degrees");
     pvl += PvlKeyword("PhaRef", toString(m_gRef), "degrees");
@@ -230,22 +240,25 @@ namespace Isis {
     PvlKeyword bbc("BandBinCenter");
     PvlKeyword bbct("BandBinCenterTolerance");
     PvlKeyword bbn("BandNumber");
-    PvlKeyword a0("A0");
-    PvlKeyword a1("A1");
-    PvlKeyword a2("A2");
-    PvlKeyword a3("A3");
+
+    std::vector<PvlKeyword> aTermKeywords;
+    std::vector<PvlKeyword> bTermKeywords;
+    for (unsigned int i = 0; i < m_bandpho[0].aTerms.size(); i++)
+        aTermKeywords.push_back(PvlKeyword("A" + toString((int) i)));
+    for (unsigned int i = 0; i < m_bandpho[0].bTerms.size(); i++)
+        bTermKeywords.push_back(PvlKeyword("B" + toString((int) i)));
 
     for (unsigned int i = 0; i < m_bandpho.size(); i++) {
-      Parameters &p = m_bandpho[i];
-      units.addValue(p.units);
-      phostd.addValue(toString(p.phoStd));
-      bbc.addValue(toString(p.wavelength));
-      bbct.addValue(toString(p.tolerance));
-      bbn.addValue(toString(p.band));
-      a0.addValue(toString(p.a0));
-      a1.addValue(toString(p.a1));
-      a2.addValue(toString(p.a2));
-      a3.addValue(toString(p.a3));
+        Parameters &p = m_bandpho[i];
+        units.addValue(p.units);
+        phostd.addValue(toString(p.phoStd));
+        bbc.addValue(toString(p.wavelength));
+        bbct.addValue(toString(p.tolerance));
+        bbn.addValue(toString(p.band));
+        for (unsigned int j = 0; j < aTermKeywords.size(); j++)
+          aTermKeywords[j].addValue(toString(p.aTerms[j]));
+        for (unsigned int j = 0; j < bTermKeywords.size(); j++)
+          bTermKeywords[j].addValue(toString(p.bTerms[j]));
     }
 
     pvl += units;
@@ -253,10 +266,11 @@ namespace Isis {
     pvl += bbc;
     pvl += bbct;
     pvl += bbn;
-    pvl += a0;
-    pvl += a1;
-    pvl += a2;
-    pvl += a3;
+
+    for (unsigned int i = 0; i < aTermKeywords.size(); i++)
+        pvl += aTermKeywords[i];
+    for (unsigned int i = 0; i < bTermKeywords.size(); i++)
+        pvl += bTermKeywords[i];
 
     return;
   }
@@ -267,11 +281,11 @@ namespace Isis {
    *
    * This method determines the set of LROCEmpirical parameters to
    * use for a given wavelength. It iterates through all band profiles
-   * as read from the PVL file and computes the difference between 
-   * wavelength parameter and the BandBinCenter keyword. The absolute 
-   * value of this value is checke against the BandBinCenterTolerance 
-   * parameter and if it is less than or equal to it, a Parameter 
-   * container is returned. 
+   * as read from the PVL file and computes the difference between
+   * wavelength parameter and the BandBinCenter keyword. The absolute
+   * value of this value is check against the BandBinCenterTolerance
+   * parameter and if it is less than or equal to it, a Parameter
+   * container is returned.
    *
    * @param wavelength The wavelength to find parameters for
    *
@@ -280,8 +294,8 @@ namespace Isis {
    *                                     found for the wavelength then a
    *                                     default parameters object is returned.
    *
-   * @author 2016-08-15 Victor Silva 
-   * 
+   * @author 2016-08-15 Victor Silva
+   *
    * @internal
    *   @history 2016-08-15 Victor Silva - Adapted from the lrowacpho application
    *                           written by Kris Becker.
@@ -325,18 +339,26 @@ namespace Isis {
    *
    * @internal
    *   @history 2016-08-15 Victor Silva - Adapted from the lrowacpho application
-                              written by Kris Becker.
+   *            written by Kris Becker.
+   *
+   *   @history 2021-03-12 Victor Silva - Added b parameters for 2019 version of
+   *            LROC Empirical algorithm
+   *
    */
   LROCEmpirical::Parameters LROCEmpirical::extract( const DbProfile &profile) const {
     Parameters pars;
-    pars.a1 = toDouble(ConfKey(profile, "A1", toString(0.0)));
-    pars.a2 = toDouble(ConfKey(profile, "A2", toString(0.0)));
-    pars.a3 = toDouble(ConfKey(profile, "A3", toString(0.0)));
+
+    for (int i=0; i<4; i++)
+        pars.aTerms.push_back(toDouble(ConfKey(profile, "A" + toString(i), toString(0.0))));
+    for (int i=0; i<7; i++)
+        pars.bTerms.push_back(toDouble(ConfKey(profile, "B" + toString(i), toString(0.0))));
+
     pars.wavelength = toDouble(ConfKey(profile, "BandBinCenter", toString(Null)));
     pars.tolerance = toDouble(ConfKey(profile, "BandBinCenterTolerance", toString(Null)));
     //  Determine equation units - defaults to Radians
     pars.units = ConfKey(profile, "Units", QString("Radians"));
     pars.phaUnit = (pars.units.toLower() == "degrees") ? 1.0 : rpd_c();
+    pars.algoVersion = toInt(ConfKey(profile, "AlgorithmVersion", QString("0")));
 
     return (pars);
   }
