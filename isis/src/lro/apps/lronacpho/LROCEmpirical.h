@@ -27,7 +27,7 @@ namespace Isis {
    *
    * @internal
    *   @history 2016-08-15 - Code adapted from lrowacpho written by Kris Becker
-   *   @history 2019-03-26 Victor Silva - Added b parameters for 2019 version of
+   *   @history 2021-03-12 Victor Silva - Added b parameters for 2019 version of
    *            LROC Empirical algorithm
    *
    */
@@ -47,7 +47,7 @@ namespace Isis {
        *
        * @internal
        *   @history 2016-08-05 - Code adapted from lrowacpho written by Kris Becker
-       *   @history 2019-03-26 Victor Silva - Added b parameters for 2019 version of
+       *   @history 2021-03-12 Victor Silva - Added b parameters for 2019 version of
        *            LROC Empirical algorithm
        */
       struct Parameters {

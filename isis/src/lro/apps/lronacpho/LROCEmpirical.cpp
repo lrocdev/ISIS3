@@ -162,7 +162,7 @@ namespace Isis {
    * @internal
    *   @history 2016-08-15 Victor Silva - Adapted code from lrowacpho application
    *                         written by Kris Becker
-   *   @history 2019-03-26 Victor Silva - Added b parameters for 2019 version of
+   *   @history 2021-03-12 Victor Silva - Added b parameters for 2019 version of
    *            LROC Empirical algorithm
    */
   double LROCEmpirical::photometry( const Parameters &parms, double i, double e, double g ) const {
@@ -185,7 +185,7 @@ namespace Isis {
     double alpha = g;
     double rcal;
 
-    if (parms.algoVersion == 2014 )//|| parms.algoVersion == 0)
+    if (parms.algoVersion == 2014 || parms.algoVersion == 0)
       rcal =  exp(parms.aTerms[0] + parms.aTerms[1] * alpha + parms.aTerms[2] * mu +  parms.aTerms[3] * mu0);
     else if (parms.algoVersion == 2019)
       rcal = mu0 / (mu + mu0) * exp(parms.bTerms[0] + parms.bTerms[1] * (alpha * alpha) + parms.bTerms[2] * alpha + parms.bTerms[3] * sqrt(alpha) + parms.bTerms[4] * mu + parms.bTerms[5] * mu0 + parms.bTerms[6] * (mu0 * mu0) );
@@ -210,7 +210,7 @@ namespace Isis {
    * @internal
    *   @history 2016-08-15 Victor Silva - Adapted code from lrowacpho application
    *                         written by Kris Becker
-   *   @history 2019-03-26 Victor Silva - Added b parameters for 2019 version of
+   *   @history 2021-03-12 Victor Silva - Added b parameters for 2019 version of
    *            LROC Empirical algorithm
    */
   void LROCEmpirical::report( PvlContainer &pvl ) {
@@ -220,9 +220,9 @@ namespace Isis {
     pvl.addComment("  mu0 = cos(incidence)");
     pvl.addComment("  mu = cos(emission)");
 
-    if (m_bandpho[0].algoVersion == 2019 || m_bandpho[0].algoVersion == 0 )
+    if (m_bandpho[0].algoVersion == 2019 )
       pvl.addComment("  F(mu, mu0, phase) = mu0 / (mu + mu0) * exp(B0 + B1 * (alpha * alpha) + B2 * alpha + B3 * sqrt(alpha) + B4 * mu + B5 * mu0 + B6 * (mu0 * mu0) )");
-    else if (m_bandpho[0].algoVersion == 2014)
+    else if (m_bandpho[0].algoVersion == 2014 || m_bandpho[0].algoVersion == 0)
       pvl.addComment("  F(mu, mu0, phase) = exp (A0 + A1 * phase + A2 * mu + A3 * mu0 ");
     else {
       std::string mess = "Could not file the correction algorithm name.";
@@ -341,7 +341,7 @@ namespace Isis {
    *   @history 2016-08-15 Victor Silva - Adapted from the lrowacpho application
    *            written by Kris Becker.
    *
-   *   @history 2019-03-26 Victor Silva - Added b parameters for 2019 version of
+   *   @history 2021-03-12 Victor Silva - Added b parameters for 2019 version of
    *            LROC Empirical algorithm
    *
    */

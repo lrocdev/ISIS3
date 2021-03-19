@@ -1,6 +1,8 @@
 #include "Isis.h"
 
-#include <string>
+#include <QDir>
+#include <QRegExp>
+#include <QString>
 
 #include "Cube.h"
 #include "IException.h"
@@ -19,6 +21,7 @@ static bool g_useDEM;
 
 void phoCal (Buffer &in, Buffer &out);
 void phoCalWithBackplane (std::vector<Isis::Buffer *> &in, std::vector<Isis::Buffer *> &out );
+void GetCalibrationDirectory(QString calibrationType, QString &calibrationDirectory);
 
 /**
  *
@@ -31,7 +34,7 @@ void phoCalWithBackplane (std::vector<Isis::Buffer *> &in, std::vector<Isis::Buf
  *
  * @internal
  *   @history 2016-09-19 Victor Silva - Adapted from lrowacpho written by Kris Becker
- *	 @history 2019-01-15 Victor Silva - Updates include ability to run with default values
+ *	 @history 2021-03-12 Victor Silva - Updates include ability to run with default values
  * 																			Added new values for 2019 version of LROC Empirical function.
  */
 void IsisMain (){
@@ -78,17 +81,43 @@ void IsisMain (){
   }
 
   // Get name of parameters file
-  Pvl params(ui.GetFileName("PHOPAR"));
-  IString algoName = PhotometricFunction::algorithmName(params);
-  algoName.UpCase();
+  QString calDir = "";
+  QString algoName = "";
+  QString algoFile = ui.GetAsString("PHOPAR");
+  qDebug() << "the algo file is: ";
+  qDebug() << algoFile ;
+  if(algoFile.toLower() == "default" || algoFile.length() == 0){
+    GetCalibrationDirectory("", calDir);
+    algoFile = calDir + "NAC_PHO_LROC_Empirical.????.pvl";
+    qDebug() << "made it in here!!!!" ;
+    //cout << algoFile.toStdString() << endl;
+  }
+
+  FileName algoFileName(algoFile);
+
+  if(algoFileName.isVersioned())
+    algoFileName = algoFileName.highestVersion();
+
+  if(!algoFileName.fileExists()) {
+    QString msg = algoFile + " does not exist.";
+    throw IException(IException::User, msg, _FILEINFO_);
+  }
+
+  Pvl params(algoFileName.expanded());
+
+
+
+  algoName = PhotometricFunction::algorithmName(params);
+  algoName = algoName.toUpper();
 
   // Set NAC algorithm
   if (algoName == "LROC_EMPIRICAL") {
       g_pho = new LROCEmpirical(params, *iCube, !useBackplane);
   }
   else {
-    string msg = " Algorithm Name [" + algoName + "] not recognized. ";
+    QString msg = " Algorithm Name [" + algoName + "] not recognized. ";
     msg += "Compatible Algorithms are:\n LROC_Empirical\n";
+    qDebug() << algoName;
     throw IException(IException::User, msg, _FILEINFO_);
   }
 
@@ -185,4 +214,24 @@ void IsisMain (){
      }
    }
    return;
+ }
+
+
+ /**
+  * This method returns an QString containing the path of an
+  * LRO calibration directory
+  *
+  * @param calibrationType
+  * @param calibrationDirectory Path of the calibration directory
+  *
+  * @internal
+  *   @history 2021-03-12 Victor Silva - Added option for base calibration directory
+  */
+ void GetCalibrationDirectory(QString calibrationType, QString &calibrationDirectory) {
+   PvlGroup &dataDir = Preference::Preferences().findGroup("DataDirectory");
+   QString missionDir = (QString) dataDir["LRO"];
+   if(calibrationType != "")
+     calibrationType += "/";
+
+   calibrationDirectory = missionDir + "/calibration/" + calibrationType;
  }

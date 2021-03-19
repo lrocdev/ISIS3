@@ -124,7 +124,7 @@
     <change name="Victor Silva" date="2016-08-18">
       Version adapted from Kris Becker's LROWACPHO application from 2010
     </change>
-    <change name="Victor Silva" date="2019-01-15">
+    <change name="Victor Silva" date="2021-03-12">
       Included ability to run with default pvl values
       Added new values for 2019 version of LROC Empirical function
     </change>
@@ -182,12 +182,12 @@
       <parameter name="PHOPAR">
         <type>filename</type>
         <fileMode>input</fileMode>
-        <default><item>LROC_Empirical.pvl</item></default>
+        <default><item>default</item></default>
         <brief>
           PVL file
         </brief>
         <description>
-          This file will contain the parameters A0-A3 to use when
+          This file will contain a set of parameters A or B to use when
           applying the LROC Empirical photometric correction.  See the main program
           documentation for a full description.
         </description>
