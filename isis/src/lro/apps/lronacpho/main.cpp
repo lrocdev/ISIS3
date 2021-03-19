@@ -9,7 +9,7 @@
 #include "ProcessByLine.h"
 #include "Pvl.h"
 #include "PvlGroup.h"
-#include "SpecialPixel.h"
+
 
 using namespace std;
 using namespace Isis;
@@ -19,23 +19,21 @@ static bool g_useDEM;
 
 void phoCal (Buffer &in, Buffer &out);
 void phoCalWithBackplane (std::vector<Isis::Buffer *> &in, std::vector<Isis::Buffer *> &out );
-
 /**
  *
  * @brief Photometric application for the LRO NAC cameras
  *
- * This application provides features that allow multiband cubes for LRO NAC cameras
+ * This application provides featurs that allow multiband cubes for LRO NAC cameras 
  *   to be photometrically corrected
- *
- * @author 2016-09-16 Victor Silva
- *
+ *   
+ * @author 2016-09-16 Victor Silva   
+ *      
  * @internal
- *   @history 2016-09-19 Victor Silva - Adapted from lrowacpho written by Kris Becker
- *	 @history 2019-01-15 Victor Silva - Updates include ability to run with default values
- * 																			Added new values for 2019 version of LROC Empirical function.
+ *   @history 2016-09-19 Victor silva - Adapted from lrowacpho written by Kris Becker
+ * 
  */
 void IsisMain (){
-  // Isis Processing by brick
+  // Isis Processing by line
   ProcessByLine p;
   // Set up input cube and get camera info
   Cube *iCube = p.SetInputCube("FROM");
@@ -77,18 +75,18 @@ void IsisMain (){
     useBackplane = true;
   }
 
-  // Get name of parameters file
+  // Get parameters file
   Pvl params(ui.GetFileName("PHOPAR"));
-  IString algoName = PhotometricFunction::algorithmName(params);
+  IString algoName =   PhotometricFunction::algorithmName(params);
   algoName.UpCase();
 
-  // Set NAC algorithm
+  // Use generic NAC algorithm
   if (algoName == "LROC_EMPIRICAL") {
-      g_pho = new LROCEmpirical(params, *iCube, !useBackplane);
+    g_pho = new LROCEmpirical(params, *iCube, !useBackplane);
   }
   else {
     string msg = " Algorithm Name [" + algoName + "] not recognized. ";
-    msg += "Compatible Algorithms are:\n LROC_Empirical\n";
+    msg += "Compatible Algorithms are:\n LROC_Empirical";
     throw IException(IException::User, msg, _FILEINFO_);
   }
 
@@ -103,14 +101,13 @@ void IsisMain (){
   // Set use of DEM to calculate photometric angles
   g_useDEM = ui.GetBoolean("USEDEM");
 
-  // Begin processing by line
+   // Begin processing by line
   if(useBackplane) {
     p.StartProcess(phoCalWithBackplane);
   }
   else {
     p.StartProcess(phoCal);
   }
-
   // Start all the PVL
   PvlGroup photo("Photometry");
   g_pho->report(photo);
@@ -120,6 +117,35 @@ void IsisMain (){
   delete g_pho;
 }//end IsisMain
 
+/**
+ * @brief Apply LROC Empirical photometric correction
+ *
+ * Process function dispatched for each line to apply the LROC Empirical photometric
+ * correction function.
+ *
+ * @author 2016-09-19 Victor Silva
+ *
+ * @internal
+ *   @history 2016-09-19 Victor silva - Adapted from lrowacpho written by Kris Becker
+ *
+ * @param in Buffer containing input data
+ * @param out Buffer of photometrically corrected data
+ */
+void phoCal(Buffer &in, Buffer &out){
+  // Iterate through pixels
+  for(int i = 0; i < in.size(); i++){
+    // Ignore special pixels
+    if(IsSpecial(in[i])){
+      out[i] = in[i];
+    }
+    else{
+      // Get correction and test for validity
+      double ph = g_pho->compute(in.Line(i), in.Sample(i), in.Band(i), g_useDEM);
+      out[i] = ( IsSpecial(ph) ? Null : (in[i] * ph) );
+    }
+  }
+  return;
+}//end phoCal
 
 /**
  * @brief Apply LROC Empirical photometric correction with backplane
@@ -135,54 +161,24 @@ void IsisMain (){
  * @param in Buffer containing input data
  * @param out Buffer of photometrically corrected data
  */
- void phoCal(Buffer &in, Buffer &out){
-   // Iterate through pixels
-   for(int i = 0; i < in.size(); i++){
-     // Ignore special pixels
-     if(IsSpecial(in[i])){
-       out[i] = in[i];
-     }
-     else{
-       // Get correction and test for validity
-       double ph = g_pho->compute(in.Line(i), in.Sample(i), in.Band(i), g_useDEM);
-       out[i] = ( IsSpecial(ph) ? Null : (in[i] * ph) );
-     }
-   }
-   return;
- }//end phoCal
+void phoCalWithBackplane ( std::vector<Isis::Buffer *> &in, std::vector<Isis::Buffer *> &out ) {
 
- /**
-  * @brief Apply LROC Empirical photometric correction with backplane
-  *
-  * Short function dispatched for each line to apply the LROC Empirical photometrc
-  * correction function.
-  *
-  * @author 2016-09-19 Victor Silva
-  *
-  * @internal
-  *   @history 2016-09-19 Victor silva - Adapted from lrowacpho written by Kris Becker
-  *
-  * @param in Buffer containing input data
-  * @param out Buffer of photometrically corrected data
-  */
- void phoCalWithBackplane ( std::vector<Isis::Buffer *> &in, std::vector<Isis::Buffer *> &out ) {
+  Buffer &image = *in[0];
+  Buffer &phase = *in[1];
+  Buffer &emission = *in[2];
+  Buffer &incidence = *in[3];
+  Buffer &calibrated = *out[0];
 
-   Buffer &image = *in[0];
-   Buffer &phase = *in[1];
-   Buffer &emission = *in[2];
-   Buffer &incidence = *in[3];
-   Buffer &calibrated = *out[0];
-
-   for (int i = 0; i < image.size(); i++) {
-     //  Don't correct special pixels
-     if (IsSpecial(image[i])) {
-       calibrated[i] = image[i];
-     }
-     else {
-     // Get correction and test for validity
-       double ph = g_pho->photometry(incidence[i], emission[i], phase[i], image.Band(i));
-       calibrated[i] = (IsSpecial(ph) ? Null : image[i] * ph);
-     }
-   }
-   return;
- }
+  for (int i = 0; i < image.size(); i++) {
+    //  Don't correct special pixels
+    if (IsSpecial(image[i])) {
+      calibrated[i] = image[i];
+    }
+    else {
+    // Get correction and test for validity
+      double ph = g_pho->photometry(incidence[i], emission[i], phase[i], image.Band(i));
+      calibrated[i] = (IsSpecial(ph) ? Null : image[i] * ph);
+    }
+  }
+  return;
+}
