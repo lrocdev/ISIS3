@@ -63,7 +63,7 @@ namespace Isis {
   // TODO: DOCUMENT EVERYTHING
   Spice::Spice(Cube &cube) {
     Pvl &lab = *cube.label();
-    if (cube.hasBlob("String", "CSMState")) {
+    if (cube.hasBlob("CSMState", "String")) {
       csmInit(cube, lab);
     }
     else {
@@ -1405,7 +1405,7 @@ namespace Isis {
       return;
     }
 
-    if (m_usingAle) {
+    if (m_usingAle || !m_usingNaif) {
       double og_time = m_bodyRotation->EphemerisTime();
       m_bodyRotation->SetEphemerisTime(et.Et());
       m_sunPosition->SetEphemerisTime(et.Et());

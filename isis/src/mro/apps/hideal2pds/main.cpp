@@ -128,7 +128,7 @@ void IsisMain() {
   int nbits = ui.GetInteger("BITS");
   switch (nbits) {
     case 8:
-      p.SetOutputType(Isis::UnsignedWord);
+      p.SetOutputType(UnsignedByte);
       p.SetOutputRange(VALID_MIN1, VALID_MAX1);
       p.SetOutputNull(NULL1);
       p.SetOutputLis(LOW_INSTR_SAT1);
@@ -180,8 +180,7 @@ void IsisMain() {
   cubeLab.Auto(pdsLabel);
 
   // get original label information
-  OriginalLabel origBlob;
-  inputCube->read(origBlob);
+  OriginalLabel origBlob = inputCube->readOriginalLabel();
   Pvl origLabel;
   PvlObject origLabelObj = origBlob.ReturnLabels();
   origLabelObj.setName("OriginalLabelObject");
