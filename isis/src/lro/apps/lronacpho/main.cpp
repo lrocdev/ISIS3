@@ -84,10 +84,13 @@ void IsisMain (){
   QString calDir = "";
   QString algoName = "";
   QString algoFile = ui.GetAsString("PHOPAR");
-
+  qDebug() << "the algo file is: ";
+  qDebug() << algoFile ;
   if(algoFile.toLower() == "default" || algoFile.length() == 0){
     GetCalibrationDirectory("", calDir);
     algoFile = calDir + "NAC_PHO_LROC_Empirical.????.pvl";
+    qDebug() << "made it in here!!!!" ;
+    //cout << algoFile.toStdString() << endl;
   }
 
   FileName algoFileName(algoFile);
@@ -114,6 +117,7 @@ void IsisMain (){
   else {
     QString msg = " Algorithm Name [" + algoName + "] not recognized. ";
     msg += "Compatible Algorithms are:\n LROC_Empirical\n";
+    qDebug() << algoName;
     throw IException(IException::User, msg, _FILEINFO_);
   }
 
